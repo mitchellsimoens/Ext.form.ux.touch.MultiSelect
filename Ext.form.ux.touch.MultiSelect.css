@@ -1,0 +1,16 @@
+.x-multiselect-wrap {
+	padding: 2em;
+	column-gap: 1em;
+}
+
+.x-multiselect-item {
+	border: 2px solid #000000;
+	border-radius: 1em;
+	padding: 1em;
+	margin: 1em 0;
+	background-color: #c3daf9;
+}
+
+.x-multiselect-item.x-item-selected {
+	background-color: #6593cf;
+}
