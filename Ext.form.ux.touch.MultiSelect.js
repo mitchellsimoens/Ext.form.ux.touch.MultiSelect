@@ -1,3 +1,16 @@
+/*
+    Author       : Mitchell Simoens
+    Site         : http://simoens.org/Sencha-Projects/demos/
+    Contact Info : mitchellsimoens@gmail.com
+    Purpose      : Create more customizable Select field
+	
+	License      : GPL v3 (http://www.gnu.org/licenses/gpl.html)
+    Warranty     : none
+    Price        : free
+    Version      : 1.0b
+    Date         : 01/09/2011
+*/
+
 Ext.ns("Ext.form.ux.touch");
 
 Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
@@ -7,15 +20,16 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 	itemType: "list",
 	multiSelect: true,
 	delimiter: ",",
-	
+
 	getDataView: function() {
-		return {
+		var config = this.getItemConfig() || {};
+		
+		Ext.applyIf(config, {
 			xtype: "dataview",
 			store: this.store,
 			itemId: "list",
 			scroll: false,
-			multiSelect: this.multiSelect,
-			simpleSelect: true,
+			simpleSelect: this.multiSelect,
 			itemSelector: "div.x-multiselect-item",
 			tpl: new Ext.XTemplate(
 				'<div class="x-multiselect-wrap" style="-webkit-column-count: ' + this.columns + ';">',
@@ -24,24 +38,29 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 					'</tpl>',
 				'</div>'
 			)
-		};
+		});
+		
+		return config;
 	},
-	
+
 	getList: function() {
-		return {
+		var config = this.itemConfig || {};
+		
+		Ext.applyIf(config, {
 			xtype: "list",
 			store: this.store,
 			itemId: "list",
 			scroll: false,
-			multiSelect: this.multiSelect,
-			simpleSelect: true,
+			simpleSelect: this.multiSelect,
 			itemTpl : [
 				'<span class="x-list-label">{' + this.displayField + '}</span>',
 				'<span class="x-list-selected"></span>'
 			]
-		};
+		});
+		
+		return config;
 	},
-	
+
 	getItemPanel: function() {
 		if (!this.itemPanel) {
 			var item;
@@ -53,16 +72,16 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 					item = this.getList();
 					break;
 			}
-			
+
 			if (typeof item === "undefined") {
 				throw "Valid options for itemType - dataview, list, picker";
 			}
-			
+
 			item.listeners = {
 				scope: this,
 				selectionchange: this.onListSelectionChange
 			};
-			
+
 			this.itemPanel = new Ext.Panel({
 				floating         : true,
 				stopMaskTapEvent : false,
@@ -70,28 +89,37 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 				width            : this.itemWidth,
 				cls              : "x-select-overlay",
 				scroll           : "vertical",
-				items            : item
+				items            : item,
+				listeners        : {
+					scope : this,
+					hide  : this.destroyItemPanel
+				}
 			});
 		}
-		
+
 		return this.itemPanel;
 	},
 	
+	destroyItemPanel: function() {
+		this.itemPanel.destroy();
+		delete this.itemPanel;
+	},
+
 	showComponent: function() {
 		var itemType = this.itemType;
 		if (itemType === "picker") {
 			this.getPicker().show();
 		} else {
 			var itemPanel = this.getItemPanel();
-			
+
 			itemPanel.showBy(this.el, "fade", false);
 		}
 		this.isActive = true;
 	},
-	
+
 	onListSelectionChange: function(sm, recs) {
 		var numSelected = recs.length;
-		
+
 		if (numSelected > 0) {
 			var values = [];
 			for (var i = 0; i < numSelected; i++) {
@@ -103,23 +131,36 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 		} else {
 			this.setValue("");
 		}
+		if (!this.multiSelect) {
+			var itemPanel = this.getItemPanel();
+			itemPanel.hide();
+		}
 	},
-	
+
 	setValue: function(value) {
 		var idx = 0,
 			hiddenField = this.hiddenField,
 			text = [],
-			rec;
+			rec,
+			store = this.store;
 		
-		if (value === "") {
-			text = [];
-		} else {
-			var values = value.split(this.delimiter);
+		if (value.length > 0 || typeof value === "number") {
+			if (typeof value === "string") {
+				var values = value.split(this.delimiter);
+			} else {
+				var values = [value];
+			}
+
 			var valuesLen = values.length;
 			for (var i = 0; i < valuesLen; i++) {
-				idx = this.store.findExact(this.valueField, values[i]);
-				rec = this.store.getAt(idx);
-				text.push(rec.get(this.displayField));
+				idx = store.findExact(this.valueField, values[i]);
+				if (idx < 0) {
+					idx = store.find(this.valueField, values[i]);
+				}
+				if (idx >= 0) {
+					rec = store.getAt(idx);
+					text.push(rec.get(this.displayField));
+				}
 			}
 		}
 		this.value = value;
@@ -129,7 +170,7 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
 		}
 		this.fireEvent("change", this, this.getValue());
 	},
-	
+
 	destroy: function() {
         Ext.form.ux.touch.MultiSelect.superclass.destroy.apply(this, arguments);
         Ext.destroy(this.itemPanel);
