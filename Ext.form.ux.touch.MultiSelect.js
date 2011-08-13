@@ -29,6 +29,7 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
             store: this.store,
             itemId: "list",
             scroll: false,
+            multiSelect: this.multiSelect,
             simpleSelect: this.multiSelect,
             itemSelector: "div.x-multiselect-item",
             tpl: new Ext.XTemplate(
@@ -51,6 +52,7 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
             store: this.store,
             itemId: "list",
             scroll: false,
+            multiSelect: this.multiSelect,
             simpleSelect: this.multiSelect,
             itemTpl : [
                 '<span class="x-list-label">{' + this.displayField + '}</span>',
@@ -62,14 +64,16 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
     },
 
     getItemPanel: function() {
-        if (!this.itemPanel) {
-            var item;
-            switch (this.itemType) {
+        var me = this,
+            item;
+
+        if (!me.itemPanel) {
+            switch (me.itemType) {
                 case "dataview" :
-                    item = this.getDataView();
+                    item = me.getDataView();
                     break;
                 case "list" :
-                    item = this.getList();
+                    item = me.getList();
                     break;
             }
 
@@ -78,26 +82,25 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
             }
 
             item.listeners = {
-                scope: this,
-                selectionchange: this.onListSelectionChange
+                scope           : me,
+                selectionchange : me.onListSelectionChange
             };
 
-            this.itemPanel = new Ext.Panel({
+            me.itemPanel = new Ext.Panel({
                 floating         : true,
                 stopMaskTapEvent : false,
                 hideOnMaskTap    : true,
-                width            : this.itemWidth,
                 cls              : "x-select-overlay",
                 scroll           : "vertical",
                 items            : item,
                 listeners        : {
-                    scope : this,
-                    hide  : this.destroyItemPanel
+                    scope : me,
+                    hide  : me.destroyItemPanel
                 }
             });
         }
 
-        return this.itemPanel;
+        return me.itemPanel;
     },
     
     destroyItemPanel: function() {
@@ -106,77 +109,118 @@ Ext.form.ux.touch.MultiSelect = Ext.extend(Ext.form.Select, {
     },
     
     showComponent: function() {
-        var itemType = this.itemType;
-        if (itemType === "picker") {
-            this.getPicker().show();
-        } else {
-            var itemPanel = this.getItemPanel();
+        var me       = this,
+            itemType = me.itemType,
+            value    = me.value,
+            store    = me.store,
+            v        = 0,
+            recs     = [],
+            itemPanel, values, vNum, idx, rec;
 
-            itemPanel.showBy(this.el, "fade", false);
+        if (itemType === "picker") {
+            me.getPicker().show();
+        } else {
+            itemPanel = me.getItemPanel();
+
+            itemPanel.showBy(me.el, "fade", false);
             
-            if (this.value != "") {
-                var values = this.value.toString().split(",");
-                for (var i = 0; i < values.length; i++) {
-                    index = this.store.findExact(this.valueField, values[i]);
-                    itemPanel.down('#list').getSelectionModel().select(index != -1 ? index : 0, true, true);
+            if (value != "") {
+                values = value.toString().split(",");
+                vNum   = values.length;
+
+                for (; v < vNum; v++) {
+                    idx = me.findIndex(values[v]);
+
+                    if (idx > -1) {
+                        rec = store.getAt(idx);
+                        recs.push(rec);
+                    }
                 }
+
+                itemPanel.down('#list').getSelectionModel().select(recs, false, true)
             }
         }
-        this.isActive = true;
+        me.isActive = true;
     },
 
     onListSelectionChange: function(sm, recs) {
-        var numSelected = recs.length;
+        var me         = this,
+            valueField = me.valueField,
+            delimiter  = me.delimiter,
+            store      = me.store,
+            rNum       = recs.length,
+            r          = 0,
+            values     = [],
+            rec, itemPanel;
 
-        if (numSelected > 0) {
-            var values = [];
-            for (var i = 0; i < numSelected; i++) {
-                var rec = recs[i];
-                values.push(rec.get(this.valueField));
+        if (rNum > 0) {
+            for (; r < rNum; r++) {
+                rec = recs[r];
+
+                values.push(rec.get(valueField));
             }
-            this.setValue(values.join(this.delimiter));
-            this.fireEvent("selectionchange", this, recs);
+            me.setValue(values.join(delimiter));
+            me.fireEvent("selectionchange", this, recs);
         } else {
-            this.setValue("");
+            me.setValue("");
         }
-        if (!this.multiSelect) {
-            var itemPanel = this.getItemPanel();
+        if (!me.multiSelect) {
+            itemPanel = me.getItemPanel();
             itemPanel.hide();
         }
     },
 
     setValue: function(value) {
-        var idx = 0,
-            hiddenField = this.hiddenField,
-            text = [],
-            rec,
-            store = this.store;
+        var me           = this,
+            store        = me.store,
+            hiddenField  = me.hiddenField,
+            displayField = me.displayField,
+            delimiter    = me.delimiter,
+            idx          = 0,
+            v            = 0,
+            text         = [],
+            rec, values, vNum;
         
         if (value.length > 0 || typeof value === "number") {
             if (typeof value === "string") {
-                var values = value.split(this.delimiter);
+                values = value.split(delimiter);
             } else {
-                var values = [value];
+                values = [value];
             }
 
-            var valuesLen = values.length;
-            for (var i = 0; i < valuesLen; i++) {
-                idx = store.findExact(this.valueField, values[i]);
-                if (idx < 0) {
-                    idx = store.find(this.valueField, values[i]);
-                }
+            vNum = values.length;
+
+            for (; v < vNum; v++) {
+                idx = this.findIndex(values[v]);
+
                 if (idx >= 0) {
                     rec = store.getAt(idx);
-                    text.push(rec.get(this.displayField));
+
+                    text.push(rec.get(displayField));
                 }
             }
         }
-        this.value = value;
-        this.fieldEl.dom.value = text.join(this.delimiter);
+        me.value             = value;
+        me.fieldEl.dom.value = text.join(delimiter);
+
         if (hiddenField) {
-            hiddenField.dom.value = this.value;
+            hiddenField.dom.value = me.value;
         }
-        this.fireEvent("change", this, this.getValue());
+
+        me.fireEvent("change", me, value);
+    },
+
+    findIndex: function(value) {
+        var me         = this,
+            valueField = me.valueField,
+            store      = me.store,
+            idx        = store.findBy(function(rec) {
+                if (rec.get(valueField) === value) {
+                    return true;
+                }
+            }, me);
+
+        return idx;
     },
 
     destroy: function() {
